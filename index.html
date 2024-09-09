@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leaflet Draw with Google Maps-like Functionality</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+  <!-- Leaflet Draw CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw/dist/leaflet.draw.css" />
+
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+    }
+    #map {
+      height: 100%;
+      width: 100%;
+    }
+    .leaflet-draw-toolbar a.leaflet-draw-draw-marker {
+      background-image: url('https://cdn.iconscout.com/icon/free/png-256/gun-1449646-1226281.png') !important;
+      background-size: cover;
+    }
+    .custom-icon {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+    }
+    img {
+      width: 48px;
+      height: 48px;
+    }
+    #captureBtn, #completePolygonBtn {
+      position: absolute;
+      top: 90%;
+      z-index: 1001;
+      padding: 10px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    #captureBtn {
+      left: 20px;
+    }
+    #completePolygonBtn {
+      left: 150px;
+    }
+    #captureBtn:hover, #completePolygonBtn:hover {
+      background-color: #0056b3;
+    }
+    #custom-pointer {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 1000;
+      pointer-events: none;
+    }
+    #custom-pointer img {
+      width: 40px;
+      height: 40px;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <button id="captureBtn">Capture Position</button>
+  <button id="completePolygonBtn">Complete Polygon</button>
+  <div id="custom-pointer">
+    <img src="/Target_Bullseye-Logo_White_transparent.png" alt="Pointer">
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <!-- Leaflet Draw JS -->
+  <script src="https://unpkg.com/leaflet-draw/dist/leaflet.draw.js"></script>
+
+  <script>
+    // Initialize the map
+    const map = L.map('map').setView([51.505, -0.09], 13);
+
+    // Add Esri's satellite tile layer
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{x}/{y}', {
+      attribution: '&copy; <a href="https://www.esri.com">Esri</a> &mdash; Source: Esri, USGS, NOAA',
+      maxZoom: 18,
+    }).addTo(map);
+
+    // Initialize the draw feature group
+    const drawnItems = new L.FeatureGroup();
+    map.addLayer(drawnItems);
+
+    // Configure draw control and set custom marker icon
+    const drawControl = new L.Control.Draw({
+      edit: {
+        featureGroup: drawnItems,
+      },
+      draw: {
+        marker: {
+          icon: L.icon({
+            iconUrl: 'png-transparent-add-plus-icon-thumbnail.png',
+            iconSize: [32, 32], // Custom marker icon size
+          }),
+        },
+      },
+    });
+    map.addControl(drawControl);
+
+    // Variables to manage drawing state
+    let isDrawing = false;
+    let capturedPoints = [];
+    const lines = [];
+
+    // Handle the start of drawing
+    map.on('draw:drawstart', function () {
+      isDrawing = true;
+      map.on('mousemove', enablePanning);
+    });
+
+    // Handle the end of drawing
+    map.on('draw:drawstop', function () {
+      isDrawing = false;
+      map.off('mousemove', enablePanning);
+    });
+
+    // Enable panning while drawing
+    function enablePanning() {
+      if (isDrawing) {
+        map.dragging.enable();
+      }
+    }
+
+    // Capture button event listener
+    document.getElementById('captureBtn').addEventListener('click', function () {
+      const mapCenter = map.getCenter();
+
+      if (capturedPoints.length > 0) {
+        const lastPoint = capturedPoints[capturedPoints.length - 1];
+        const line1 = L.polyline([lastPoint, mapCenter], { color: 'blue' }).addTo(map);
+        lines.push(line1);
+      }
+
+      capturedPoints.push(mapCenter);
+      map.on('move', updateLines);
+    });
+
+    // Update lines when the map moves
+    function updateLines() {
+      const mapCenter = map.getCenter();
+      lines.forEach(line => map.removeLayer(line)); // Remove old lines
+
+      for (let i = 0; i < capturedPoints.length - 1; i++) {
+        const line1 = L.polyline([capturedPoints[i], capturedPoints[i + 1]], { color: 'blue' }).addTo(map);
+        lines.push(line1);
+      }
+
+      if (capturedPoints.length > 0) {
+        const lastPoint = capturedPoints[capturedFPoints.length - 1];
+        const line2 = L.polyline([lastPoint, mapCenter], { color: 'red' }).addTo(map);
+        lines.push(line2);
+      }
+    }
+
+    // Complete polygon button event listener
+    document.getElementById('completePolygonBtn').addEventListener('click', function () {
+      if (capturedPoints.length > 2) {
+        // Close the polygon by connecting the last point to the first
+        const polygon = L.polygon(capturedPoints, { color: 'green' }).addTo(map);
+        drawnItems.addLayer(polygon);
+
+        // Clear the points and lines
+        capturedPoints = [];
+        lines.forEach(line => map.removeLayer(line));
+        lines.length = 0;
+      } else {
+        alert('You need at least 3 points to complete a polygon.');
+      }
+    });
+  </script>
+</body>
+</html>
