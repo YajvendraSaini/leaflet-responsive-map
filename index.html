@@ -3,13 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Leaflet Draw with Google Maps-like Functionality</title>
+  <title>Leaflet Polygon with Area Popup</title>
 
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 
   <!-- Leaflet Draw CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet-draw/dist/leaflet.draw.css" />
+
+  <!-- Add Turf.js for area calculation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/5.1.6/turf.min.js"></script>
 
   <style>
     html, body {
@@ -19,21 +22,6 @@
     #map {
       height: 100%;
       width: 100%;
-    }
-    .leaflet-draw-toolbar a.leaflet-draw-draw-marker {
-      background-image: url('https://cdn.iconscout.com/icon/free/png-256/gun-1449646-1226281.png') !important;
-      background-size: cover;
-    }
-    .custom-icon {
-      position: absolute;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 1000;
-    }
-    img {
-      width: 48px;
-      height: 48px;
     }
     #captureBtn, #completePolygonBtn {
       position: absolute;
@@ -55,27 +43,12 @@
     #captureBtn:hover, #completePolygonBtn:hover {
       background-color: #0056b3;
     }
-    #custom-pointer {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 1000;
-      pointer-events: none;
-    }
-    #custom-pointer img {
-      width: 40px;
-      height: 40px;
-    }
   </style>
 </head>
 <body>
   <div id="map"></div>
   <button id="captureBtn">Capture Position</button>
   <button id="completePolygonBtn">Complete Polygon</button>
-  <div id="custom-pointer">
-    <img src="/Target_Bullseye-Logo_White_transparent.png" alt="Pointer">
-  </div>
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -97,18 +70,10 @@
     const drawnItems = new L.FeatureGroup();
     map.addLayer(drawnItems);
 
-    // Configure draw control and set custom marker icon
+    // Configure draw control
     const drawControl = new L.Control.Draw({
       edit: {
         featureGroup: drawnItems,
-      },
-      draw: {
-        marker: {
-          icon: L.icon({
-            iconUrl: 'png-transparent-add-plus-icon-thumbnail.png',
-            iconSize: [32, 32], // Custom marker icon size
-          }),
-        },
       },
     });
     map.addControl(drawControl);
@@ -162,7 +127,7 @@
       }
 
       if (capturedPoints.length > 0) {
-        const lastPoint = capturedPoints[capturedFPoints.length - 1];
+        const lastPoint = capturedPoints[capturedPoints.length - 1];
         const line2 = L.polyline([lastPoint, mapCenter], { color: 'red' }).addTo(map);
         lines.push(line2);
       }
@@ -174,6 +139,26 @@
         // Close the polygon by connecting the last point to the first
         const polygon = L.polygon(capturedPoints, { color: 'green' }).addTo(map);
         drawnItems.addLayer(polygon);
+
+        // Calculate the area of the polygon using turf.js
+        const geojsonPolygon = {
+          "type": "Feature",
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [capturedPoints.map(point => [point.lng, point.lat])], // Turf expects lng, lat format
+          }
+        };
+        
+        // Calculate the area in square meters
+        const area = turf.area(geojsonPolygon);
+
+        // Format area to hectares (10,000 square meters = 1 hectare)
+        const areaInHectares = (area / 10000).toFixed(2);
+
+        // Add a popup with the area
+        polygon.bindPopup(`Polygon Area: ${areaInHectares} hectares`).on('click', function (e) {
+          this.openPopup();
+        });
 
         // Clear the points and lines
         capturedPoints = [];
